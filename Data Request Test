@@ -1,0 +1,12 @@
+
+weight = input('Weight')
+force= weight + 9.80
+displaceX = input ('Displacement X')
+displaceY = input ('Displacement Y')
+displaceZ = input ('Displacement Z')
+force_used = []
+displacement = []
+ import csv
+ csv_file_name = 'Test' + '.csv'
+          
+
