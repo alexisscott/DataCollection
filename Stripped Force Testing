@@ -1,0 +1,162 @@
+import sys
+from dvrk.psm import *
+import rospy
+import csv
+import math
+import numpy
+import PyKDL
+import time
+import datetime
+from sensor_msgs.msg import PointCloud
+from geometry_msgs.msg import WrenchStamped
+
+
+
+def average_of_points(list_of_points):
+    totals = [ [], [], [] ]
+    average = [ ]
+    for axis in range(len(list_of_points[0])):
+        for nb in range(len(list_of_points)):
+            totals[axis].append(list_of_points[nb][axis])
+    for axis in range(len(list_of_points[0])):
+        average.append(sum(totals[axis])/len(totals[axis]))
+    return average
+
+class force_testing:
+
+    def __init__(self, robotName):
+        self._robot_name = robotName
+        self._robot = arm(self._robot_name)
+        self._points = [0.0, 0.0, 0.0]
+        self._force = [0.0, 0.0, 0.0]
+
+    def points_callback(self, data):
+        self._points[:] = data.points
+    
+    def force_callback(self, data):
+        self._force = data.wrench.force
+
+    def run(self):
+        self._robot.move_joint(numpy.array([0.0,0.0,0.1,0.0,0.0,0.0,-0.20]))
+        self._robot.set_wrench_body_orientation_absolute(True)
+
+        current_wrench_body = []
+        current_joint_effort = []
+        desired_joint_effort = []
+        current_cartesian_position = []
+        desired_cartesian_position = []
+        current_joint_positions = []
+        zPosition = -0.105  #Default is -0.105
+        while not rospy.is_shutdown():
+            self._robot.move(PyKDL.Vector(0.0, 0.0, zPosition))
+            time.sleep(.3)
+            raw_input('when force sensor is under tooltip, hit [enter]')
+            for position_nb in range(1,21):
+                self._robot.move(PyKDL.Vector((0.00025 * position_nb), 0.0, zPosition))
+               
+                            current_wrench_body.append([self._robot.get_current_wrench_body()[0], 
+                                                self._robot.get_current_wrench_body()[1], 
+                                                self._robot.get_current_wrench_body()[2], 
+                                                self._robot.get_current_wrench_body()[3], 
+                                                self._robot.get_current_wrench_body()[4], 
+                                                self._robot.get_current_wrench_body()[5] ])
+                                       current_joint_effort.append([self._robot.get_current_joint_effort()[0], 
+                                                 self._robot.get_current_joint_effort()[1], 
+                                                 self._robot.get_current_joint_effort()[2], 
+                                                 self._robot.get_current_joint_effort()[3], 
+                                                 self._robot.get_current_joint_effort()[4], 
+                                                 self._robot.get_current_joint_effort()[5], 
+                                                 self._robot.get_current_joint_effort()[6] ]) 
+                    desired_joint_effort.append([self._robot.get_desired_joint_effort()[0], 
+                                                 self._robot.get_desired_joint_effort()[1], 
+                                                 self._robot.get_desired_joint_effort()[2], 
+                                                 self._robot.get_desired_joint_effort()[3], 
+                                                 self._robot.get_desired_joint_effort()[4], 
+                                                 self._robot.get_desired_joint_effort()[5],
+                                                 self._robot.get_desired_joint_effort()[6] ])
+                    current_cartesian_position.append([self._robot.get_current_position().p[0], 
+                                                       self._robot.get_current_position().p[1], 
+                                                       self._robot.get_current_position().p[2]])
+                    desired_cartesian_position.append([self._robot.get_desired_position().p[0], 
+                                                       self._robot.get_desired_position().p[1], 
+                                                       self._robot.get_desired_position().p[2]])
+                                     current_joint_positions.append([self._robot.get_current_joint_position()[0], 
+                                                    self._robot.get_current_joint_position()[1], 
+                                                    self._robot.get_current_joint_position()[2], 
+                                                    self._robot.get_current_joint_position()[3], 
+                                                    self._robot.get_current_joint_position()[4], 
+                                                    self._robot.get_current_joint_position()[5], 
+                                                    self._robot.get_current_joint_position()[6] ])
+                    time.sleep(.02)
+                print 'position recorded'
+                time.sleep(.5)
+            self._robot.move(PyKDL.Vector(0.0, 0.0, zPosition))
+            self._robot.move(PyKDL.Vector(0.0, 0.0, -0.105))
+          
+            #find ln coefficient
+            zForce = []
+            xCartesian = []
+                  tested_list = []
+            for cord in optoforce_forces:
+                zForce.append(cord[2])
+            for cord in current_cartesian_position:
+                xCartesian.append(cord[0])
+                                 untested_list = zip(zForce, cartesian_v_atracsys_diff)
+            for cord in untested_list:
+                if cord[0] > 0.08:
+                    tested_list.append(cord)
+            force_for_plotting, diff_for_plotting = zip(*tested_list)
+            force_for_plotting = list(force_for_plotting)
+            diff_for_plotting = list(diff_for_plotting)
+            coefficient, intercept = numpy.polyfit( force_for_plotting, diff_for_plotting, 1)
+            print 'coefficient: ', coefficient
+
+            #write values to csv file
+            csv_file_name = 'ForceTestingData/force_testing_output_at_z-pos_of_' + str(zPosition) + '_' + ('-'.join(str(x) for x in list(tuple(datetime.datetime.now().timetuple())[:6]))) + '.csv'
+            print "\n Values will be saved in: ", csv_file_name
+            f = open(csv_file_name, 'wb')
+            writer = csv.writer(f)
+            writer.writerow(['coefficient:', coefficient])
+            writer.writerow(["current wrench body", "", "", "", "", "","current joint effort", "", "", "", "", "", "","desired joint effort", "", "", "", "", "", "", "current cartesian positions", "", "","desired cartesian positions", "", "", "current joint positions"])
+            for row in range(len(current_atracsys_position)):
+                writer.writerow([current_wrench_body[row][0],
+                                 current_wrench_body[row][1],
+                                 current_wrench_body[row][2],
+                                 current_wrench_body[row][3],
+                                 current_wrench_body[row][4],
+                                 current_joint_effort[row][0],
+                                 current_joint_effort[row][1],
+                                 current_joint_effort[row][2],
+                                 current_joint_effort[row][3],
+                                 current_joint_effort[row][4],
+                                 current_joint_effort[row][5],
+                                 current_joint_effort[row][6],
+                                 desired_joint_effort[row][0],
+                                 desired_joint_effort[row][1],
+                                 desired_joint_effort[row][2],
+                                 desired_joint_effort[row][3],
+                                 desired_joint_effort[row][4],
+                                 desired_joint_effort[row][5],
+                                 desired_joint_effort[row][6],
+                                 current_cartesian_position[row][0],
+                                 current_cartesian_position[row][1],
+                                 current_cartesian_position[row][2],
+                                 desired_cartesian_position[row][0],
+                                 desired_cartesian_position[row][1],
+                                 desired_cartesian_position[row][2],
+                                 current_joint_positions[row][0],
+                                 current_joint_positions[row][1],
+                                 current_joint_positions[row][2],
+                                 current_joint_positions[row][3],
+                                 current_joint_positions[row][4],
+                                 current_joint_positions[row][5],
+                                 current_joint_positions[row][6] ])
+
+            rospy.signal_shutdown('Finished Task')
+
+if (len(sys.argv) != 2):
+    print sys.argv[0] + ' requires one argument, i.e. name of dVRK arm'
+else:
+    robotName = sys.argv[1]
+    app = force_testing(robotName)
+    app.run()
