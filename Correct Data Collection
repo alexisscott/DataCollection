@@ -18,8 +18,8 @@ class force_testing:
             choice = self.printmenu() 
             if choice == 1:
                p.home()
-	       p.move_joint_one(-1.4, 0)
-	       p.move_joint_one(0.0, 1)
+	       p.move_joint_one(-2.0, 0)
+	       p.move_joint_one(-.35,1)
 	       p.move_joint_one(0.1, 2)
               	
                
@@ -27,9 +27,9 @@ class force_testing:
             #Test point for information
 
             elif choice == 2:
+		date = input('Date')
                 weight = input('Weight')
                 displace=input('Displacement')
-                force = weight*9.8
               	joint_position = p.get_current_position()
 		desired_joint = p.get_desired_joint_position()
                	effort = p.get_current_joint_effort()
@@ -45,7 +45,7 @@ class force_testing:
                 print "Values will be saved in", csv_file_name 
                 f = open(csv_file_name,'a')
                 writer = csv.writer(f)
-                writer.writerow([force,displace,effort,desired_effort,joint_position,desired_joint,cart_position,desired_cartposition])
+                writer.writerow([date,weight,displace,effort,desired_effort,joint_position,desired_joint,cart_position,desired_cartposition])
                 f.close()
            
             #Close Program
